@@ -1,7 +1,6 @@
 import mock
 
 from mock import patch
-from mock import call
 from collections import namedtuple
 
 from .test_helper import patch_open, raises
@@ -68,9 +67,12 @@ class TestBootImageKiwi(object):
 
     @patch('kiwi.boot.image.dracut.Kernel')
     @patch('kiwi.boot.image.dracut.Command.run')
+    @patch('kiwi.boot.image.dracut.Command.call')
+    @patch('kiwi.boot.image.dracut.CommandProcess')
     @patch('kiwi.boot.image.base.BootImageBase.is_prepared')
     def test_create_initrd(
-        self, mock_prepared, mock_command, mock_kernel
+        self, mock_prepared, mock_cmd_process,
+        mock_cmd_call, mock_cmd_run, mock_kernel
     ):
         kernel = mock.Mock()
         kernel_details = mock.Mock()
@@ -82,37 +84,38 @@ class TestBootImageKiwi(object):
             '/system-directory/var/lib/bar', install_media=True
         )
         self.boot_image.create_initrd()
-        assert mock_command.call_args_list == [
-            call([
+        mock_cmd_call.assert_called_once_with(
+            [
                 'chroot', 'system-directory',
                 'dracut', '--force', '--no-hostonly',
                 '--no-hostonly-cmdline', '--xz',
                 '--install', 'system-directory/etc/foo',
                 '--install', '/system-directory/var/lib/bar',
                 'LimeJeOS-openSUSE-13.2.x86_64-1.13.2.initrd.xz', '1.2.3'
-            ]),
-            call([
+            ]
+        )
+        mock_cmd_run.assert_called_once_with(
+            [
                 'mv',
                 'system-directory/LimeJeOS-openSUSE-13.2.x86_64-1.13.2.initrd.xz',
                 'some-target-dir'
-            ])
-        ]
-        mock_command.reset_mock()
+            ]
+        )
+        mock_cmd_call.reset_mock()
+        mock_cmd_run.reset_mock()
         self.boot_image.create_initrd(basename='foo', install_initrd=True)
-        assert mock_command.call_args_list == [
-            call([
+        mock_cmd_call.assert_called_once_with(
+            [
                 'chroot', 'system-directory',
                 'dracut', '--force', '--no-hostonly',
                 '--no-hostonly-cmdline', '--xz',
                 '--install', '/system-directory/var/lib/bar',
                 'foo.xz', '1.2.3'
-            ]),
-            call([
-                'mv',
-                'system-directory/foo.xz',
-                'some-target-dir'
-            ])
-        ]
+            ]
+        )
+        mock_cmd_run.assert_called_once_with(
+            ['mv', 'system-directory/foo.xz', 'some-target-dir']
+        )
 
     @raises(KiwiDiskBootImageError)
     @patch('kiwi.boot.image.dracut.Kernel')

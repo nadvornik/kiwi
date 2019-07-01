@@ -106,6 +106,49 @@ class TestCommandProcess(object):
             call('%s: %s', 'system', 'data')
         ]
 
+    @patch('kiwi.command.Command')
+    @patch('kiwi.logger.log.debug')
+    def test_poll_stderr_to_stdout(
+        self, mock_log_debug, mock_command
+    ):
+        process = CommandProcess(mock_command, stderr_to_stdout=True)
+        self.data_err = [
+            bytes(b''), bytes(b''), bytes(b'\n'),
+            bytes(b'r'), bytes(b'r'), bytes(b'e')
+        ]
+        process.command.command.process.poll = self.flow
+        process.command.command.output_available = self.flow_out_available
+        process.command.command.error_available = self.flow_err_available
+        process.command.command.output.read = self.flow_out
+        process.command.command.error.read = self.flow_err
+        process.command.command.process.returncode = 0
+        process.poll()
+        assert mock_log_debug.call_args_list == [
+            call('%s: %s', 'system', 'err'),
+            call('%s: %s', 'system', 'data')
+        ]
+
+    @patch('kiwi.command.Command')
+    @patch('kiwi.logger.log.debug')
+    def test_poll_stderr_to_stdout_simultaneous_line(
+        self, mock_log_debug, mock_command
+    ):
+        process = CommandProcess(mock_command, stderr_to_stdout=True)
+        self.data_err = [
+            bytes(b''), bytes(b'\n'), bytes(b't'),
+            bytes(b's'), bytes(b'e'), bytes(b't')
+        ]
+        process.command.command.process.poll = self.flow
+        process.command.command.output_available = self.flow_out_available
+        process.command.command.error_available = self.flow_err_available
+        process.command.command.output.read = self.flow_out
+        process.command.command.error.read = self.flow_err
+        process.command.command.process.returncode = 0
+        process.poll()
+        assert mock_log_debug.call_args_list == [
+            call('%s: %s', 'system', 'data\ntest')
+        ]
+
     @raises(KiwiCommandError)
     @patch('kiwi.command.Command')
     def test_poll_raises(self, mock_command):
@@ -115,7 +158,7 @@ class TestCommandProcess(object):
         process.command.command.error_available = self.flow_err_available
         process.command.command.output.read = self.flow_out
         process.command.command.error.read = self.flow_err
-        process.command.command.output.read.return_value = 'data'
+        process.command.command.output.read.return_value = 'data error'
         process.command.command.process.returncode = 1
         process.poll()
 
